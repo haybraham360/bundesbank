@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import Image from 'next/image'
 import Link from 'next/link'
@@ -73,10 +73,25 @@ const AuthForm = ({ type }: { type: string }) => {
             password: data.password,
           })
 
-          if(response) router.push('/')
+          if(response) {
+            console.log(response); 
+            router.push('/');
+          }  else {
+            // Add error handling
+            console.error('Sign in failed', response);
+            form.setError('root', {
+              type: 'manual',
+              message: 'Sign in failed. Please check your credentials.'
+            });
+          }
         }
       } catch (error) {
         console.log(error);
+        console.error('Submission Error:', error);
+        form.setError('root', {
+          type: 'manual',
+          message: 'An unexpected error occurred'
+        });
       } finally {
         setIsLoading(false);
       }
@@ -120,6 +135,11 @@ const AuthForm = ({ type }: { type: string }) => {
         <>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              {form.formState.errors.root && (
+                <div className="text-red-500 text-sm">
+                  {form.formState.errors.root.message}
+                </div>
+              )}
               {type === 'sign-up' && (
                 <>
                   <div className="flex gap-4">

@@ -20,15 +20,41 @@ export const getUserInfo = async ({ userId }: getUserInfoProps) => {
   try {
     const { database } = await createAdminClient();
 
-    const user = await database.listDocuments(
+    // Try multiple query approaches
+    const userByUserId = await database.listDocuments(
       DATABASE_ID!,
       USER_COLLECTION_ID!,
       [Query.equal('userId', [userId])]
-    )
+    );
 
-    return parseStringify(user.documents[0]);
+    const userByAppwriteId = await database.listDocuments(
+      DATABASE_ID!,
+      USER_COLLECTION_ID!,
+      [Query.equal('$id', [userId])]
+    );
+
+    console.log('User Query Debugging:', {
+      userId,
+      userByUserIdTotal: userByUserId.total,
+      userByAppwriteIdTotal: userByAppwriteId.total,
+      userByUserIdDocs: userByUserId.documents,
+      userByAppwriteIdDocs: userByAppwriteId.documents
+    });
+
+    // Check both query approaches
+    if (userByUserId.total > 0) {
+      return parseStringify(userByUserId.documents[0]);
+    }
+
+    if (userByAppwriteId.total > 0) {
+      return parseStringify(userByAppwriteId.documents[0]);
+    }
+
+    console.error(`Comprehensive search failed for userId: ${userId}`);
+    return null;
   } catch (error) {
-    console.log(error)
+    console.error('Error fetching user info:', error);
+    return null;
   }
 }
 
@@ -37,6 +63,12 @@ export const signIn = async ({ email, password }: signInProps) => {
     const { account } = await createAdminClient();
     const session = await account.createEmailPasswordSession(email, password);
 
+    // Log session details
+    console.log('Session Created:', {
+      userId: session.userId,
+      sessionSecret: session.secret ? 'Present' : 'Missing'
+    });
+
     cookies().set("appwrite-session", session.secret, {
       path: "/",
       httpOnly: true,
@@ -44,11 +76,31 @@ export const signIn = async ({ email, password }: signInProps) => {
       secure: true,
     });
 
-    const user = await getUserInfo({ userId: session.userId }) 
+    const user = await getUserInfo({ userId: session.userId });
+
+    if (!user) {
+      console.error('User not found');
+      return null;
+    }
 
     return parseStringify(user);
-  } catch (error) {
-    console.error('Error', error);
+  } catch (error: unknown) {
+    // Type guard to check if error is an object with expected properties
+    if (error instanceof Error) {
+      console.error('Authentication Error:', {
+        name: error.name,
+        message: error.message,
+        // Additional properties like code and type might not exist for all errors
+        code: (error as any).code,
+        type: (error as any).type
+      });
+    } else {
+      // Handle cases where error is not an Error object
+      console.error('Unknown authentication error:', error);
+    }
+
+    // Return null to indicate authentication failure
+    return null;
   }
 }
 
@@ -81,14 +133,19 @@ export const signUp = async ({ password, ...userData }: SignUpParams) => {
     const newUser = await database.createDocument(
       DATABASE_ID!,
       USER_COLLECTION_ID!,
-      ID.unique(),
+      newUserAccount.$id, // Use the Appwrite account ID directly
       {
         ...userData,
-        userId: newUserAccount.$id,
+        userId: newUserAccount.$id, // Explicitly set userId
         dwollaCustomerId,
         dwollaCustomerUrl
       }
     )
+
+    console.log('User Creation Debug:', {
+      appwriteAccountId: newUserAccount.$id,
+      newUserDocument: newUser
+    });
 
     const session = await account.createEmailPasswordSession(email, password);
 
@@ -101,10 +158,10 @@ export const signUp = async ({ password, ...userData }: SignUpParams) => {
 
     return parseStringify(newUser);
   } catch (error) {
-    console.error('Error', error);
+    console.error('Signup Error:', error);
+    return null;
   }
 }
-
 export async function getLoggedInUser() {
   try {
     const { account } = await createSessionClient();
