@@ -15,7 +15,7 @@
   <h3 align="center">A Fintech Bank Application</h3>
 
    <div align="center">
-     Build this project step by step with me as your developer <a href="https://www.youtube.com/@javascriptmastery/videos" target="_blank"><b>Haybraham</b></a> Reach out for your projdcrs
+     Build this project step by step with me as your developer <b>Haybraham</b> Reach out for your projects
     </div>
 </div>
 
